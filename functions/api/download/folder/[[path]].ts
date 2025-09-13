@@ -1,5 +1,5 @@
 // 最終修正：使用 require 語法以同時兼容本地 TypeScript 和 Cloudflare 運行環境
-import JSZip = require('jszip');
+//import JSZip = require('jszip');
 
 // 這是一個 Cloudflare Pages 函數
 // 最終修正：將 R2 綁定變量名從 R2_BUCKET 改為 BUCKET，以匹配項目中其他文件
