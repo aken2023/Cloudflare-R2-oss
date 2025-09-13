@@ -1,41 +1,60 @@
-export const onRequestGet: PagesFunction = async (context) => {
-  const { env, params } = context;
-  const bucket = env.R2_BUCKET as R2Bucket;
-  const folderPath = params.path as string;
+// 最終修正：使用 require 語法以同時兼容本地 TypeScript 和 Cloudflare 運行環境
+import JSZip = require('jszip');
 
-  // 列出文件夹下所有对象
-  const objects = await bucket.list({ prefix: folderPath });
+// 這是一個 Cloudflare Pages 函數
+// 最終修正：將 R2 綁定變量名從 R2_BUCKET 改為 BUCKET，以匹配項目中其他文件
+export const onRequest: PagesFunction<{ BUCKET: any }> = async (context) => {
+  try {
+    const { request, env, params } = context;
+    
+    // 從 URL 中獲取資料夾路徑
+    let folderPath = '';
+    if (Array.isArray(params.path)) {
+      folderPath = params.path.join('/');
+    }
 
-  if (!objects.objects.length) {
-    return new Response("No files found", { status: 404 });
-  }
+    if (!folderPath) {
+      return new Response('Folder path is required.', { status: 400 });
+    }
 
-  // 拼接所有文件数据流
-  const stream = new ReadableStream({
-    async start(controller) {
-      for (const obj of objects.objects) {
-        const file = await bucket.get(obj.key);
-        if (!file) continue;
+    // 在 R2 中列出該資料夾下的所有文件
+    const list = await env.BUCKET.list({
+      prefix: folderPath + '/',
+    });
 
-        // 读取为 ArrayBuffer
-        const buf = await file.arrayBuffer();
+    if (list.objects.length === 0) {
+      return new Response('Folder is empty or not found.', { status: 404 });
+    }
 
-        // 在流里简单分隔（仅供标识用，避免混在一起）
-        const separator = new TextEncoder().encode(`\n---FILE:${obj.key}---\n`);
-        controller.enqueue(separator);
-        controller.enqueue(new Uint8Array(buf));
+    // 創建一個新的 JSZip 實例
+    const zip = new JSZip();
+
+    // 遍歷所有文件，將它們添加到 zip 包中
+    for (const object of list.objects) {
+      const file = await env.BUCKET.get(object.key);
+      if (file) {
+        // 從完整路徑中移除資料夾前綴，以保持正確的目錄結構
+        const fileName = object.key.substring(folderPath.length + 1);
+        zip.file(fileName, await file.arrayBuffer());
       }
-      controller.close();
-    },
-  });
+    }
 
-  // 用 gzip 压缩
-  const compressedStream = stream.pipeThrough(new CompressionStream("gzip"));
+    // 生成 .zip 文件內容
+    const zipContent = await zip.generateAsync({ type: 'blob' });
 
-  return new Response(compressedStream, {
-    headers: {
-      "Content-Type": "application/gzip",
-      "Content-Disposition": `attachment; filename="${folderPath}.tar.gz"`,
-    },
-  });
+    // 提取資料夾名作為 zip 文件名
+    const folderName = folderPath.split('/').pop() || 'download';
+
+    // 返回 .zip 文件給用戶下載
+    return new Response(zipContent, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${folderName}.zip"`,
+      },
+    });
+
+  } catch (e) {
+    return new Response(e.message, { status: 500 });
+  }
 };
+
