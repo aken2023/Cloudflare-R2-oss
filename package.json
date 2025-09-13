@@ -23,3 +23,10 @@
     "jszip": "^3.10.1"
   }
 }
+
+{
+  "type": "module",
+  "dependencies": {
+    "jszip": "^3.10.1"
+  }
+}
