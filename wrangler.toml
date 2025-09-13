@@ -1,1 +1,12 @@
+name = "flaredrive"
+compatibility_date = "2025-09-13"
 
+[build]
+command = "npm run build"
+
+[build.upload]
+format = "modules"
+dir = "./dist"
+
+[build.esbuild]
+external = ["jszip"]
