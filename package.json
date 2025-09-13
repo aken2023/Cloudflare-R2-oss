@@ -22,5 +22,9 @@
   "dependencies": {
     "jszip": "^3.10.1"
   }
+    "scripts": {
+    "build": "esbuild functions/**/*.ts --bundle --outdir=dist --format=esm --external:jszip"
+  }
+}
 }
 
